@@ -37,6 +37,11 @@ body::after{content:"";position:fixed;inset:0;background-image:linear-gradient(v
 .logo{display:block;height:84px;width:auto}
 .lead{color:var(--mute);margin:14px 0 26px;max-width:34ch}
 .hero-ticket{display:inline-flex;gap:8px;align-items:center;background:var(--card);border:1px dashed var(--acc);color:var(--acc);padding:7px 14px;border-radius:999px;font-weight:700;font-size:.85rem;margin-bottom:18px;animation:pulse 2.6s ease-in-out infinite}
+.prize{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px 18px;margin:0 0 22px;box-shadow:0 16px 40px rgba(47,56,146,.1)}
+.prize small{font-weight:700;letter-spacing:.08em;color:var(--acc);font-size:.72rem}
+.prize b{font:800 1.45rem var(--hd);display:block;letter-spacing:-.03em;line-height:1.1;margin:2px 0}
+.prize span{color:var(--mute);font-size:.9rem}
+.gift{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(150deg,#1b75bc,#2f3892);color:#fff;font-size:1.45rem}
 @keyframes pulse{50%{box-shadow:0 0 0 9px rgba(27,117,188,.22)}}
 form{backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 24px 60px rgba(47,56,146,.14);background:var(--card);border:1px solid var(--line);border-radius:26px;padding:22px 18px;display:grid;gap:16px}
 label{display:grid;gap:6px;font-weight:600;font-size:.9rem}
@@ -138,6 +143,25 @@ th{color:var(--mute);font-weight:600}
 <script>
 (function(){
 var KEY="raap_regs_v1",LAST="raap_last_v1",PIN="2026";
+var SHEET="https://script.google.com/macros/s/AKfycbzR-eQkL2IQ7_CJIxgKkeq3dCMMoC42o2hZ_kyfIvw4lrjtRxS-HQ7RoEqvTYOyFEQVQQ/exec";
+function postSheet(r){
+return fetch(SHEET,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(r)}).then(function(res){
+if(!res.ok)throw new Error("sheet");
+return res.text();
+}).then(function(t){
+if(String(t).replace(/^\s+|\s+$/g,"").toLowerCase().indexOf("ok")!==0)throw new Error(t||"sheet");
+});
+}
+function loadSheet(){
+return fetch(SHEET).then(function(res){
+if(!res.ok)throw new Error("sheet");
+return res.text();
+}).then(function(t){
+var rows=JSON.parse(t);
+if(!Array.isArray(rows))throw new Error("sheet");
+return rows.map(function(x){var phone=String(x.phone||x.Phone||"");if(phone.charAt(0)==="'")phone=phone.slice(1);if(phone==="undefined")phone="";return{at:x.at||x["Registered at"]||"",token:x.token||x.Ticket||"",name:x.name||x.Name||"",phone:phone,org:x.org||x.Company||"",remarks:x.remarks||x.Remarks||"",prod:x.prod||x["Interested in"]||""}}).filter(function(x){return x.token||x.name||x.phone});
+});
+}
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
 function save(a){try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}}
 function last(){try{return localStorage.getItem(LAST)}catch(e){return null}}
@@ -153,9 +177,10 @@ var brand='<div class="brand"><a class="bl" href="https://techlogica.com/" targe
 
 function home(){
 app.innerHTML='<section class="view">'+brand+
-'<div class="hero-ticket">Free lucky draw entry</div>'+
-'<h1>Register in a minute, win at the draw.</h1>'+
-'<p class="lead">Tell us who you are and what you’d like to see. Your ticket appears instantly.</p>'+
+'<div class="hero-ticket">Win 1 month free</div>'+
+'<h1>Join the lucky draw.</h1>'+
+'<p class="lead">Win 1 month of Raap Nexus free. Register in a minute and your ticket appears instantly.</p>'+
+'<div class="prize"><div class="gift" aria-hidden="true">🎁</div><div><small>WINNERS GET</small><b>1 month free</b><span>of Raap Nexus — on us</span></div></div>'+
 '<form id="f" novalidate>'+
 '<label>Full name<input name="name" autocomplete="name" placeholder="Your name" required></label>'+
 '<label>Mobile number<input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="10-digit number" required></label>'+
@@ -163,11 +188,11 @@ app.innerHTML='<section class="view">'+brand+
 '<label>Remarks<textarea name="remarks" rows="3" maxlength="300" placeholder="Anything you’d like us to know? (optional)"></textarea></label>'+
 '<fieldset><legend>What interests you? Pick one or both.</legend><div class="chips">'+
 '<label class="chip"><input type="checkbox" name="prod" value="Raap Nexus"><span>Raap Nexus</span></label>'+
-'<label class="chip"><input type="checkbox" name="prod" value="RaapERP"><span>RaapERP</span></label>'+
+'<label class="chip"><input type="checkbox" name="prod" value="Raap Pro"><span>Raap Pro</span></label>'+
 '</div></fieldset>'+
 '<p class="err" id="err" role="alert"></p>'+
 '<button class="btn" type="submit">Get my lucky ticket</button></form>'+
-'<p class="fine">One entry per mobile number. Draw terms are displayed at our stall.</p></section>';
+'<p class="fine">One entry per mobile number. The winner receives 1 month of Raap Nexus free. Draw terms are displayed at our stall.</p></section>';
 $("#f").addEventListener("submit",function(e){
 e.preventDefault();var d=new FormData(e.target),name=(d.get("name")||"").trim(),ph=(d.get("phone")||"").replace(/\D/g,"").slice(-10);
 if(name.length<2){$("#err").textContent="Enter your full name.";return}
@@ -177,13 +202,18 @@ var a=load(),ex=a.filter(function(x){return x.phone===ph})[0];
 if(ex){setLast(ex.token);location.hash="ticket";return}
 var r={token:token(a.map(function(x){return x.token})),name:name,phone:ph,org:(d.get("org")||"").trim(),remarks:(d.get("remarks")||"").trim().slice(0,300),prod:d.getAll("prod").join(" + "),at:new Date().toISOString()};
 var btn=e.target.querySelector(".btn");btn.disabled=true;btn.classList.add("busy");btn.textContent="Registering…";
+postSheet(r).then(function(){
 a.push(r);save(a);setLast(r.token);fresh=true;
-setTimeout(function(){success(r.name.split(" ")[0],function(){location.hash="ticket"})},900)})}
+success(r.name.split(" ")[0],function(){location.hash="ticket"});
+}).catch(function(){
+btn.disabled=false;btn.classList.remove("busy");btn.textContent="Get my lucky ticket";
+$("#err").textContent="Could not save your entry. Please try again.";
+})})}
 
 function products(){var B="https://techlogica.com/",TL=[["TIDS Navigator","Cloud-based ERP that tracks and records every major business function.",B+"tids-navigator/"],["TIDS Render","Feature-rich billing software to streamline daily operations.",B+"tids-render/"],["QubePOS","Management tools to monitor your business, locally or globally.",B+"qubepos/"],["ShopNcart","Retail software that simplifies shop operations.",B+"shopncart/"],["SambaPOS","Restaurant POS for a smooth experience for staff and customers.",B+"sambapos/"],["Dine Point","Restaurant reservations, table management and guest communication.",B+"dine-point/"],["GymNaut","All-in-one gym management with members, bookings and payments.",B+"gymnaut/"],["Praccxa","Academy management for students, teachers, attendance, fees and reports.",""],["Herms","Heavy equipment rental management for fleet, bookings and maintenance.",""],["TIDS Treasure","Day-to-day operations software built for Nidhi companies.",B+"tids-treasure/"],["Token Management System","AI-driven queue and token management.",B+"token-management-system/"],["Money Transfer Utility","Online banking and money transfer services.",B+"money-transfer-utility/"],["MLM Software","Automation for multi-level marketing businesses.",B+"mlm-2/"],["RAAP platform","Rapid application development framework built on .NET.",B+"rapid-applicationdevelopment/"]];
 app.innerHTML='<section class="view">'+brand+'<h2>Two products, one stall.</h2><p class="lead">Ask for a live demo at the counter. It takes five minutes.</p>'+'<a class="lnk" href="https://techlogica.com/products/" target="_blank" rel="noopener">See every product at techlogica.com/products</a>'+
 '<article class="prod" style="--c:var(--blue)"><h3>Raap Nexus</h3><p>One connected space for your team’s daily work.</p><ul><li>Tasks, chats and files in a single place</li><li>Works smoothly on mobile</li><li>Quick setup for small teams</li></ul></article>'+
-'<article class="prod" style="--c:var(--acc)"><h3>RaapERP</h3><p>Run sales, stock and accounts without spreadsheets.</p><ul><li>Billing, inventory and reports together</li><li>GST-ready invoices</li><li>Built for growing Indian businesses</li></ul></article>'+
+'<article class="prod" style="--c:var(--acc)"><h3>Raap Pro</h3><p>Run sales, stock and accounts without spreadsheets.</p><ul><li>Billing, inventory and reports together</li><li>GST-ready invoices</li><li>Built for growing Indian businesses</li></ul></article>'+
 '<h3 class="more">More from Techlogica</h3><div class="pgrid">'+TL.map(function(p){var a=!!p[2];return'<'+(a?'a href="'+p[2]+'" target="_blank" rel="noopener"':'div')+' class="pc"><b>'+p[0]+'</b><span>'+p[1]+'</span></'+(a?'a':'div')+'>'}).join("")+'</div>'+
 '<div class="acts" style="animation:none;margin-top:26px"><a class="btn" style="display:grid;place-items:center;text-decoration:none" href="#home">Join the draw</a><a class="btn ghost" style="display:grid;place-items:center;text-decoration:none" href="https://techlogica.com/" target="_blank" rel="noopener">Visit our site</a></div></section>'}
 
@@ -197,7 +227,8 @@ function ticket(){
 var a=load(),t=last(),r=a.filter(function(x){return x.token===t})[0];
 if(!r){app.innerHTML='<section class="view">'+brand+'<h2>No ticket yet.</h2><p class="lead">Register first and your lucky draw ticket will show up here.</p><a class="btn" style="display:grid;place-items:center;text-decoration:none" href="#home">Register now</a></section>';return}
 var dt=new Date(r.at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
-app.innerHTML='<section class="view">'+brand+'<div class="cheer"><h2>You’re in, '+esc(r.name.split(" ")[0])+'!</h2><p class="lead" style="margin:8px auto 0">Keep this ticket handy for the draw.</p></div>'+
+app.innerHTML='<section class="view">'+brand+'<div class="cheer"><h2>You’re in, '+esc(r.name.split(" ")[0])+'!</h2><p class="lead" style="margin:8px auto 0">Keep this ticket handy. The winner gets 1 month of Raap Nexus free.</p></div>'+
+'<div class="prize"><div class="gift" aria-hidden="true">🎁</div><div><small>WINNERS GET</small><b>1 month free</b><span>of Raap Nexus — on us</span></div></div>'+
 '<div class="ticket-wrap"><div class="tk"><div class="tk-top"><i class="notch-r"></i><small>Techlogica lucky draw ticket</small><div class="big" id="tok">'+esc(r.token)+'</div><div class="name">'+esc(r.name)+'</div></div>'+
 '<div class="tk-bot"><i class="notch-r"></i><div class="row"><div><small>Interested in</small><b>'+esc(r.prod)+'</b></div><div style="text-align:right"><small>Registered</small><b>'+dt+'</b></div></div><div class="bars"></div></div></div></div>'+
 '<div class="acts"><button class="btn ghost" id="cp">Copy ticket ID</button><button class="btn ghost" id="pr">Print ticket</button></div></section>';
@@ -217,18 +248,22 @@ var authed=false;
 function admin(){
 if(!authed){app.innerHTML='<section class="view">'+brand+'<h2>Staff only.</h2><p class="lead">Enter the staff PIN to see registrations.</p><form id="pf" style="gap:12px"><input id="pin" type="password" inputmode="numeric" placeholder="PIN" aria-label="Staff PIN"><p class="err" id="err" role="alert"></p><button class="btn" type="submit">Open registrations</button></form></section>';
 $("#pf").onsubmit=function(e){e.preventDefault();if($("#pin").value===PIN){authed=true;admin()}else $("#err").textContent="Wrong PIN. Try again."};return}
-var a=load().slice().reverse(),q="";
+app.innerHTML='<section class="view">'+brand+'<h2>Registrations</h2><p class="lead">Loading the Google Sheet…</p></section>';
+loadSheet().then(function(rows){renderAdmin(rows.slice().reverse(),true)}).catch(function(){renderAdmin(load().slice().reverse(),false)});
+}
+function renderAdmin(a,fromSheet){
+var q="";
 function draw(){var l=a.filter(function(x){return(x.name+x.phone+x.token+x.org).toLowerCase().indexOf(q)>-1});
-$("#rows").innerHTML=l.length?l.map(function(x){return'<tr><td><b>'+esc(x.token)+'</b></td><td>'+esc(x.name)+'<br><span style="color:var(--mute)">'+esc(x.phone)+(x.org?" · "+esc(x.org):"")+'</span>'+(x.remarks?'<br><i>'+esc(x.remarks)+'</i>':"")+'</td><td>'+esc(x.prod)+'</td><td><button class="del" data-t="'+esc(x.token)+'">Delete</button></td></tr>'}).join(""):'<tr><td colspan="4">No registrations yet. They appear here as visitors sign up.</td></tr>'}
-var by=function(p){return a.filter(function(x){return x.prod.indexOf(p)>-1}).length};
-app.innerHTML='<section class="view">'+brand+'<h2>Registrations</h2><div class="stat"><div><b>'+a.length+'</b>Total</div><div><b>'+by("Raap Nexus")+'</b>Nexus</div><div><b>'+by("RaapERP")+'</b>ERP</div></div>'+
-'<input id="s" placeholder="Search name, phone or ticket" style="margin-top:14px"><div class="scroll"><table><thead><tr><th>Ticket</th><th>Visitor</th><th>Interest</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>'+
-'<div class="acts" style="animation:none"><button class="btn ghost" id="csv">Copy as CSV</button><button class="btn ghost" id="pick">Pick a winner</button></div><p class="fine" id="win"></p><p class="fine">Data on this page stays in this browser. Connect a production database before the event.</p></section>';
+$("#rows").innerHTML=l.length?l.map(function(x){return'<tr><td><b>'+esc(x.token)+'</b></td><td>'+esc(x.name)+'<br><span style="color:var(--mute)">'+esc(x.phone)+(x.org?" · "+esc(x.org):"")+'</span>'+(x.remarks?'<br><i>'+esc(x.remarks)+'</i>':"")+'</td><td>'+esc(x.prod)+'</td>'+(fromSheet?"":'<td><button class="del" data-t="'+esc(x.token)+'">Delete</button></td>')+'</tr>'}).join(""):'<tr><td colspan="4">No registrations yet. They appear here as visitors sign up.</td></tr>'}
+var by=function(p){return a.filter(function(x){return String(x.prod||"").indexOf(p)>-1}).length};
+app.innerHTML='<section class="view">'+brand+'<h2>Registrations</h2><div class="stat"><div><b>'+a.length+'</b>Total</div><div><b>'+by("Raap Nexus")+'</b>Nexus</div><div><b>'+(by("Raap Pro")+by("RaapERP"))+'</b>Pro</div></div>'+
+'<input id="s" placeholder="Search name, phone or ticket" style="margin-top:14px"><div class="scroll"><table><thead><tr><th>Ticket</th><th>Visitor</th><th>Interest</th>'+(fromSheet?"":"<th></th>")+'</tr></thead><tbody id="rows"></tbody></table></div>'+
+'<div class="acts" style="animation:none"><button class="btn ghost" id="csv">Copy as CSV</button><button class="btn ghost" id="pick">Pick a winner</button></div><p class="fine" id="win"></p><p class="fine">'+(fromSheet?"Showing every registration saved in the Leads sheet.":"Could not read the sheet yet. Paste the updated script into Apps Script, deploy a new version, then refresh. This list is only what was saved in this browser.")+'</p></section>';
 draw();
 $("#s").oninput=function(){q=this.value.toLowerCase();draw()};
-$("#rows").onclick=function(e){var t=e.target.getAttribute("data-t");if(t&&confirm("Delete ticket "+t+"?")){save(load().filter(function(x){return x.token!==t}));admin()}};
+if(!fromSheet)$("#rows").onclick=function(e){var t=e.target.getAttribute("data-t");if(t&&confirm("Delete ticket "+t+"?")){save(load().filter(function(x){return x.token!==t}));admin()}};
 $("#csv").onclick=function(){var s="token,name,phone,company,remarks,interest,registered\n"+a.map(function(x){return[x.token,x.name,x.phone,x.org,x.remarks||"",x.prod,x.at].map(function(v){return'"'+String(v).replace(/"/g,'""')+'"'}).join(",")}).join("\n");try{navigator.clipboard.writeText(s).then(function(){$("#csv").textContent="Copied"})}catch(e){}};
-$("#pick").onclick=function(){if(!a.length){$("#win").textContent="No entries to draw from yet.";return}var w=a[Math.floor(Math.random()*a.length)];$("#win").innerHTML='Winner: <b>'+esc(w.token)+'</b> · '+esc(w.name);confetti()}}
+$("#pick").onclick=function(){if(!a.length){$("#win").textContent="No entries to draw from yet.";return}var w=a[Math.floor(Math.random()*a.length)];$("#win").innerHTML='Winner: <b>'+esc(w.token)+'</b> · '+esc(w.name)+'<br>Prize: 1 month of Raap Nexus free';confetti()}}
 
 function route(){var r=(location.hash||"#home").slice(1);if(["home","products","ticket","admin"].indexOf(r)<0)r="home";nav(r);window.scrollTo(0,0);({home:home,products:products,ticket:ticket,admin:admin})[r]();app.insertAdjacentHTML("beforeend",'<p class="fine">Presented by <a class="lnk" href="https://techlogica.com/" target="_blank" rel="noopener">techlogica.com</a></p>')}
 addEventListener("hashchange",route);route();
